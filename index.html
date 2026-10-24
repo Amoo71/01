@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Circus Baby's Ocean Facility</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    background: #000;
+    overflow: hidden;
+    width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Courier New', monospace;
+    -webkit-user-select: none; user-select: none;
+    touch-action: none;
+}
+canvas { display: block; image-rendering: pixelated; }
+#ui {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none; z-index: 10;
+}
+#ui > * { pointer-events: auto; }
+
+/* HUD */
+.hud {
+    position: fixed; top: 8px; left: 8px; right: 8px;
+    display: none; justify-content: space-between; align-items: flex-start;
+    z-index: 20; pointer-events: none;
+}
+.hud.on { display: flex; }
+.hud > * { pointer-events: auto; }
+.hud-left, .hud-right { display: flex; flex-direction: column; gap: 4px; }
+.hud-bar {
+    background: rgba(0,0,0,0.6); padding: 4px 10px; border-radius: 6px;
+    font-size: 12px; color: #ccc; white-space: nowrap;
+}
+.hud-bar span { font-weight: bold; }
+
+/* Mobile controls */
+.touch-controls {
+    position: fixed; bottom: 16px; left: 16px; right: 16px;
+    display: none; justify-content: space-between; align-items: flex-end;
+    z-index: 30;
+}
+.touch-controls.on { display: flex; }
+.dpad { display: grid; grid-template: repeat(3, 48px) / repeat(3, 48px); gap: 2px; }
+.dpad-btn {
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 8px; color: #fff; font-size: 20px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+}
+.dpad-btn:active { background: rgba(255,255,255,0.3); }
+.dpad-empty { background: none; border: none; }
+.action-btns { display: flex; flex-direction: column; gap: 6px; }
+.act-btn {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.25);
+    color: #fff; font-size: 11px; font-family: inherit;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+}
+.act-btn:active { background: rgba(255,255,255,0.3); }
+
+/* Title screen */
+#title-screen {
+    position: fixed; inset: 0; z-index: 100;
+    background: #060610;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+#title-screen.gone { display: none; }
+.ts-title {
+    font-size: clamp(20px, 5vw, 48px); color: #a855f7;
+    text-shadow: 0 0 20px rgba(168,85,247,0.5);
+    text-align: center; letter-spacing: 2px;
+}
+.ts-sub {
+    font-size: clamp(10px, 2vw, 16px); color: #555;
+    margin-top: 8px; text-align: center;
+}
+.ts-start {
+    margin-top: 32px; padding: 12px 32px;
+    background: transparent; border: 1px solid rgba(168,85,247,0.4);
+    color: #a855f7; font-family: inherit; font-size: 16px;
+    border-radius: 24px; cursor: pointer; letter-spacing: 2px;
+    transition: all 0.3s;
+}
+.ts-start:hover { background: rgba(168,85,247,0.15); }
+.ts-hint { margin-top: 16px; font-size: 11px; color: #333; }
+
+/* Messages */
+#msg-box {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.85); border: 1px solid rgba(168,85,247,0.3);
+    padding: 8px 20px; border-radius: 8px; color: #ccc; font-size: 13px;
+    z-index: 40; opacity: 0; transition: opacity 0.3s;
+    text-align: center; max-width: 90vw; pointer-events: none;
+}
+#msg-box.show { opacity: 1; }
+
+/* Jumpscare overlay */
+#jumpscare {
+    position: fixed; inset: 0; z-index: 200;
+    display: none; align-items: center; justify-content: center;
+    background: #000;
+}
+#jumpscare.on { display: flex; }
+#jumpscare canvas { width: 100%; height: 100%; }
+
+/* Game Over */
+#gameover {
+    position: fixed; inset: 0; z-index: 300;
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.95);
+}
+#gameover.on { display: flex; }
+.go-text { font-size: 36px; color: #ff2020; letter-spacing: 4px; }
+.go-sub { font-size: 14px; color: #555; margin-top: 12px; }
+.go-btn {
+    margin-top: 24px; padding: 10px 28px;
+    background: transparent; border: 1px solid rgba(255,255,255,0.2);
+    color: #ccc; font-family: inherit; font-size: 14px;
+    border-radius: 20px; cursor: pointer;
+}
+
+/* Night indicator */
+#night-ind {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    font-size: clamp(24px, 6vw, 48px); color: #fff;
+    text-shadow: 0 0 30px rgba(168,85,247,0.6);
+    z-index: 50; opacity: 0; transition: opacity 0.5s;
+    pointer-events: none;
+}
+#night-ind.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<!-- Title Screen -->
+<div id="title-screen">
+    <div class="ts-title">CIRCUS BABY'S<br>OCEAN FACILITY</div>
+    <div class="ts-sub">FNAF:SL × RAFT</div>
+    <button class="ts-start" onclick="startGame()">START</button>
+    <div class="ts-hint">WASD / Pfeiltasten · E = Interagieren · SPACE = Kamera</div>
+</div>
+
+<!-- HUD -->
+<div class="hud" id="hud">
+    <div class="hud-left">
+        <div class="hud-bar">HP: <span id="h-hp">100</span></div>
+        <div class="hud-bar">Hunger: <span id="h-hunger">100</span></div>
+        <div class="hud-bar" id="h-power-bar">Power: <span id="h-power">100</span>%</div>
+    </div>
+    <div class="hud-right">
+        <div class="hud-bar" id="h-location">Ozean</div>
+        <div class="hud-bar" id="h-night">Nacht 1</div>
+        <div class="hud-bar" id="h-time">12:00 AM</div>
+    </div>
+</div>
+
+<!-- Touch Controls -->
+<div class="touch-controls" id="touch-ctrls">
+    <div class="dpad">
+        <div class="dpad-empty"></div>
+        <div class="dpad-btn" data-dir="up">▲</div>
+        <div class="dpad-empty"></div>
+        <div class="dpad-btn" data-dir="left">◄</div>
+        <div class="dpad-empty"></div>
+        <div class="dpad-btn" data-dir="right">►</div>
+        <div class="dpad-empty"></div>
+        <div class="dpad-btn" data-dir="down">▼</div>
+        <div class="dpad-empty"></div>
+    </div>
+    <div class="action-btns">
+        <div class="act-btn" data-act="interact">E</div>
+        <div class="act-btn" data-act="camera">CAM</div>
+    </div>
+</div>
+
+<!-- Message box -->
+<div id="msg-box"></div>
+
+<!-- Night indicator -->
+<div id="night-ind"></div>
+
+<!-- Jumpscare -->
+<div id="jumpscare"><canvas id="js-canvas"></canvas></div>
+
+<!-- Game Over -->
+<div id="gameover">
+    <div class="go-text">GAME OVER</div>
+    <div class="go-sub" id="go-reason">An animatronic got you.</div>
+    <button class="go-btn" onclick="restartGame()">Try Again</button>
+</div>
+
+<script>
+// ===== CORE ENGINE =====
+const C = document.getElementById('game');
+const ctx = C.getContext('2d');
+
+let W, H, SCALE;
+const TILE = 32;
+const FPS = 30;
+
+function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    C.width = W;
+    C.height = H;
+    SCALE = Math.min(W, H) / 480;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ===== GAME STATE =====
+const STATE = {
+    phase: 'title',  // title, raft, facility, cameras, gameover
+    night: 1,
+    time: 0,       // 0-360 (6 hours, 0=12AM, 360=6AM)
+    timeSpeed: 0.12,
+    power: 100,
+    hp: 100,
+    hunger: 100,
+    score: 0,
+    playerX: 0,
+    playerY: 0,
+    playerDir: 0,  // 0=down,1=left,2=up,3=right
+    raftX: 400,
+    raftY: 300,
+    // Facility
+    currentRoom: 0,
+    doorLeft: true,   // true = closed
+    doorRight: true,
+    lightOn: false,
+    cameraOn: false,
+    currentCam: 0,
+    // Animatronics
+    animatronics: [],
+    // Items on raft
+    raftItems: [],
+    debris: [],
+    // Facility found
+    facilityFound: false,
+    facilityEntered: false,
+    // Messages
+    msgTimer: 0,
+};
+
+// ===== MAP DATA =====
+// Facility rooms: 0=Office, 1=BabyAuditorium, 2=BalloraGallery, 3=FuntimeAuditorium, 4=PartsService, 5=ScoopingRoom
+const ROOMS = [
+    { name: 'Office', color: '#1a1a2e', doorL: true, doorR: true, connects: [2, 3] },
+    { name: "Baby's Auditorium", color: '#2e1a2e', doorL: false, doorR: false, connects: [2] },
+    { name: 'Ballora Gallery', color: '#1a2e2e', doorL: true, doorR: false, connects: [0, 1, 4] },
+    { name: 'Funtime Auditorium', color: '#2e2e1a', doorL: false, doorR: true, connects: [0, 5] },
+    { name: 'Parts & Service', color: '#2e1a1a', doorL: false, doorR: false, connects: [2] },
+    { name: 'Scooping Room', color: '#1a1a1a', doorL: false, doorR: false, connects: [3] },
+];
+
+// Animatronic definitions
+const ANIM_DEFS = [
+    { name: 'Circus Baby', color: '#ff4466', startRoom: 1, speed: 0.3, aggression: 2 },
+    { name: 'Ballora', color: '#4466ff', startRoom: 2, speed: 0.5, aggression: 3 },
+    { name: 'Funtime Freddy', color: '#ff88cc', startRoom: 3, speed: 0.2, aggression: 4 },
+    { name: 'Funtime Foxy', color: '#ff6622', startRoom: 4, speed: 0.6, aggression: 3 },
+    { name: 'Ennard', color: '#cccccc', startRoom: 5, speed: 0.4, aggression: 5 },
+];
+
+// ===== INPUT =====
+const keys = {};
+let interactPressed = false;
+let cameraToggle = false;
+
+document.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+    if (e.key.toLowerCase() === 'e') interactPressed = true;
+    if (e.key === ' ') { e.preventDefault(); cameraToggle = true; }
+});
+document.addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+// Touch controls
+const isMobile = 'ontouchstart' in window;
+if (isMobile) document.getElementById('touch-ctrls').classList.add('on');
+
+document.querySelectorAll('.dpad-btn').forEach(btn => {
+    const dir = btn.dataset.dir;
+    btn.addEventListener('touchstart', e => { e.preventDefault(); keys[dir === 'up' ? 'w' : dir === 'down' ? 's' : dir === 'left' ? 'a' : 'd'] = true; });
+    btn.addEventListener('touchend', e => { e.preventDefault(); keys[dir === 'up' ? 'w' : dir === 'down' ? 's' : dir === 'left' ? 'a' : 'd'] = false; });
+});
+document.querySelectorAll('.act-btn').forEach(btn => {
+    btn.addEventListener('touchstart', e => {
+        e.preventDefault();
+        if (btn.dataset.act === 'interact') interactPressed = true;
+        if (btn.dataset.act === 'camera') cameraToggle = true;
+    });
+});
+
+// ===== UTILITY =====
+function showMsg(text, dur) {
+    const box = document.getElementById('msg-box');
+    box.textContent = text;
+    box.classList.add('show');
+    STATE.msgTimer = dur || 120;
+}
+
+function showNight(n) {
+    const el = document.getElementById('night-ind');
+    el.textContent = `Nacht ${n}`;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+function updateHUD() {
+    document.getElementById('h-hp').textContent = Math.max(0, Math.floor(STATE.hp));
+    document.getElementById('h-hunger').textContent = Math.max(0, Math.floor(STATE.hunger));
+    document.getElementById('h-power').textContent = Math.max(0, Math.floor(STATE.power));
+    document.getElementById('h-location').textContent =
+        STATE.phase === 'raft' ? 'Ozean' :
+        STATE.phase === 'cameras' ? 'Kameras' :
+        ROOMS[STATE.currentRoom]?.name || 'Facility';
+    document.getElementById('h-night').textContent = `Nacht ${STATE.night}`;
+
+    const hours = Math.floor(STATE.time / 60);
+    const h = 12 + hours;
+    const m = Math.floor(STATE.time % 60);
+    document.getElementById('h-time').textContent = `${h > 12 ? h - 12 : h}:${String(m).padStart(2,'0')} AM`;
+
+    document.getElementById('h-power-bar').style.display = STATE.phase === 'raft' ? 'none' : '';
+}
+
+// ===== DRAWING HELPERS =====
+function drawPixelChar(x, y, w, h, color, dir, isAnimatronic) {
+    ctx.fillStyle = color;
+    // Body
+    ctx.fillRect(x - w/2, y - h/2, w, h);
+    // Eyes
+    const eyeY = y - h/4;
+    ctx.fillStyle = isAnimatronic ? '#ff0000' : '#fff';
+    if (dir === 0 || dir === 2) { // facing down/up
+        ctx.fillRect(x - w/4 - 2, eyeY, 4, 4);
+        ctx.fillRect(x + w/4 - 2, eyeY, 4, 4);
+    } else if (dir === 1) { // left
+        ctx.fillRect(x - w/3, eyeY, 4, 4);
+        ctx.fillRect(x, eyeY, 4, 4);
+    } else { // right
+        ctx.fillRect(x, eyeY, 4, 4);
+        ctx.fillRect(x + w/3 - 4, eyeY, 4, 4);
+    }
+    if (isAnimatronic) {
+        // Glowing effect
+        ctx.fillStyle = color + '40';
+        ctx.beginPath();
+        ctx.arc(x, y, w, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function drawWater(t) {
+    // Ocean background with wave effect
+    for (let y = 0; y < H; y += 4) {
+        const wave = Math.sin((y + t * 2) * 0.02) * 8;
+        const depth = y / H;
+        const r = Math.floor(5 + depth * 10);
+        const g = Math.floor(30 + depth * 20 + wave);
+        const b = Math.floor(60 + depth * 40 + wave * 2);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(0, y, W, 4);
+    }
+}
+
+// ===== RAFT PHASE =====
+let raftTick = 0;
+let islandX = 0, islandY = 0;
+
+function initRaft() {
+    STATE.phase = 'raft';
+    STATE.playerX = W / 2;
+    STATE.playerY = H / 2;
+    STATE.raftX = W / 2;
+    STATE.raftY = H / 2;
+
+    // Place island far away
+    const angle = Math.random() * Math.PI * 2;
+    islandX = W / 2 + Math.cos(angle) * 600;
+    islandY = H / 2 + Math.sin(angle) * 600;
+
+    // Spawn debris
+    STATE.debris = [];
+    for (let i = 0; i < 15; i++) {
+        STATE.debris.push({
+            x: Math.random() * 2000 - 500,
+            y: Math.random() * 2000 - 500,
+            type: Math.random() > 0.5 ? 'wood' : 'food',
+            collected: false,
+        });
+    }
+
+    STATE.raftItems = [];
+    showMsg('Du treibst auf dem Ozean... Sammle Treibgut mit E. Finde die mysteriöse Insel!', 180);
+}
+
+function updateRaft() {
+    raftTick++;
+    const speed = 2.5;
+    let dx = 0, dy = 0;
+
+    if (keys['w'] || keys['arrowup']) { dy = -speed; STATE.playerDir = 2; }
+    if (keys['s'] || keys['arrowdown']) { dy = speed; STATE.playerDir = 0; }
+    if (keys['a'] || keys['arrowleft']) { dx = -speed; STATE.playerDir = 1; }
+    if (keys['d'] || keys['arrowright']) { dx = speed; STATE.playerDir = 3; }
+
+    if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+
+    STATE.raftX += dx;
+    STATE.raftY += dy;
+    STATE.playerX = W / 2;
+    STATE.playerY = H / 2;
+
+    // Hunger
+    STATE.hunger -= 0.008;
+    if (STATE.hunger <= 0) { STATE.hunger = 0; STATE.hp -= 0.05; }
+    if (STATE.hp <= 0) { gameOver('Du bist verhungert auf dem Ozean.'); return; }
+
+    // Interact with debris
+    if (interactPressed) {
+        interactPressed = false;
+        for (const d of STATE.debris) {
+            if (d.collected) continue;
+            const sx = d.x - STATE.raftX + W/2;
+            const sy = d.y - STATE.raftY + H/2;
+            const dist = Math.hypot(sx - STATE.playerX, sy - STATE.playerY);
+            if (dist < 40) {
+                d.collected = true;
+                if (d.type === 'food') {
+                    STATE.hunger = Math.min(100, STATE.hunger + 25);
+                    showMsg('Essen gefunden! +25 Hunger', 60);
+                } else {
+                    STATE.raftItems.push('wood');
+                    showMsg(`Holz gesammelt! (${STATE.raftItems.length} Teile)`, 60);
+                }
+                STATE.score += 10;
+            }
+        }
+
+        // Check island proximity
+        const ix = islandX - STATE.raftX + W/2;
+        const iy = islandY - STATE.raftY + H/2;
+        const iDist = Math.hypot(ix - STATE.playerX, iy - STATE.playerY);
+        if (iDist < 80 && STATE.facilityFound) {
+            enterFacility();
+            return;
+        }
+    }
+
+    // Discover island
+    const ix = islandX - STATE.raftX + W/2;
+    const iy = islandY - STATE.raftY + H/2;
+    const iDist = Math.hypot(ix - W/2, iy - H/2);
+    if (iDist < 300 && !STATE.facilityFound) {
+        STATE.facilityFound = true;
+        showMsg('Eine mysteriöse Insel! Da steht ein Gebäude... "Circus Baby\'s Entertainment & Rental". Drücke E zum Betreten!', 240);
+    }
+
+    // Drift debris closer slowly
+    for (const d of STATE.debris) {
+        if (!d.collected) {
+            d.x += Math.sin(raftTick * 0.01 + d.y * 0.01) * 0.3;
+            d.y += Math.cos(raftTick * 0.01 + d.x * 0.01) * 0.3;
+        }
+    }
+}
+
+function drawRaft() {
+    drawWater(raftTick);
+
+    const camX = STATE.raftX - W/2;
+    const camY = STATE.raftY - H/2;
+
+    // Draw debris
+    for (const d of STATE.debris) {
+        if (d.collected) continue;
+        const sx = d.x - camX;
+        const sy = d.y - camY;
+        if (sx < -50 || sx > W+50 || sy < -50 || sy > H+50) continue;
+        ctx.fillStyle = d.type === 'wood' ? '#8B6914' : '#44aa44';
+        ctx.fillRect(sx - 8, sy - 8, 16, 16);
+        if (d.type === 'food') {
+            ctx.fillStyle = '#66cc66';
+            ctx.fillRect(sx - 4, sy - 12, 8, 4);
+        }
+    }
+
+    // Draw island
+    const ix = islandX - camX;
+    const iy = islandY - camY;
+    if (ix > -200 && ix < W+200 && iy > -200 && iy < H+200) {
+        // Island ground
+        ctx.fillStyle = '#3a6b35';
+        ctx.beginPath();
+        ctx.ellipse(ix, iy, 80, 60, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Beach
+        ctx.fillStyle = '#c2b280';
+        ctx.beginPath();
+        ctx.ellipse(ix, iy + 10, 90, 40, 0, 0, Math.PI);
+        ctx.fill();
+        // Building
+        ctx.fillStyle = '#2a1a3a';
+        ctx.fillRect(ix - 30, iy - 50, 60, 50);
+        ctx.fillStyle = '#3a2a4a';
+        ctx.fillRect(ix - 35, iy - 55, 70, 10);
+        // Door
+        ctx.fillStyle = '#1a0a2a';
+        ctx.fillRect(ix - 8, iy - 30, 16, 30);
+        // Sign
+        if (STATE.facilityFound) {
+            ctx.fillStyle = '#a855f7';
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText("CIRCUS BABY'S", ix, iy - 60);
+        }
+        // Red glow from windows
+        ctx.fillStyle = `rgba(255, 40, 40, ${0.3 + Math.sin(raftTick * 0.05) * 0.2})`;
+        ctx.fillRect(ix - 25, iy - 45, 10, 12);
+        ctx.fillRect(ix + 15, iy - 45, 10, 12);
+    }
+
+    // Draw raft
+    ctx.fillStyle = '#8B6914';
+    ctx.fillRect(W/2 - 24, H/2 - 24, 48, 48);
+    ctx.fillStyle = '#6B4914';
+    for (let i = 0; i < 4; i++) {
+        ctx.fillRect(W/2 - 24, H/2 - 24 + i * 12, 48, 2);
+    }
+    // Raft upgrades based on collected wood
+    const wood = STATE.raftItems.filter(i => i === 'wood').length;
+    if (wood > 2) {
+        ctx.fillStyle = '#7B5914';
+        ctx.fillRect(W/2 - 30, H/2 - 30, 60, 60);
+        ctx.fillRect(W/2 - 24, H/2 - 24, 48, 48);
+    }
+
+    // Player on raft
+    drawPixelChar(W/2, H/2 - 8, 14, 20, '#4488ff', STATE.playerDir, false);
+
+    // Direction arrow to island
+    if (!STATE.facilityFound || (ix < 0 || ix > W || iy < 0 || iy > H)) {
+        const angle = Math.atan2(islandY - STATE.raftY, islandX - STATE.raftX);
+        const arrowX = W/2 + Math.cos(angle) * 80;
+        const arrowY = H/2 + Math.sin(angle) * 80;
+        ctx.fillStyle = '#a855f7';
+        ctx.beginPath();
+        ctx.arc(arrowX, arrowY, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('?', arrowX, arrowY + 4);
+    }
+
+    // Distance to island
+    const dist = Math.floor(Math.hypot(islandX - STATE.raftX, islandY - STATE.raftY) / 10);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`Insel: ${dist}m`, W/2, 50);
+
+    // Vignette
+    const vg = ctx.createRadialGradient(W/2, H/2, H*0.3, W/2, H/2, H*0.8);
+    vg.addColorStop(0, 'transparent');
+    vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+}
+
+// ===== FACILITY PHASE =====
+function enterFacility() {
+    STATE.phase = 'facility';
+    STATE.currentRoom = 0;
+    STATE.facilityEntered = true;
+    STATE.power = 100;
+    STATE.time = 0;
+    STATE.doorLeft = true;
+    STATE.doorRight = true;
+    STATE.lightOn = false;
+
+    // Init animatronics based on night
+    STATE.animatronics = ANIM_DEFS.slice(0, Math.min(STATE.night + 1, 5)).map(def => ({
+        ...def,
+        room: def.startRoom,
+        moveTimer: 0,
+        atDoor: false,
+        doorSide: null,
+    }));
+
+    showNight(STATE.night);
+    showMsg('Überlebe bis 6 AM! Schließe Türen mit E (links/rechts schauen). SPACE für Kameras.', 240);
+}
+
+function updateFacility() {
+    // Time passes
+    STATE.time += STATE.timeSpeed;
+    if (STATE.time >= 360) {
+        // Survived the night!
+        STATE.night++;
+        STATE.phase = 'raft';
+        showMsg(`Nacht ${STATE.night - 1} überlebt! Zurück auf dem Ozean. Neue Nacht bald...`, 180);
+        STATE.score += 100;
+        // Respawn debris
+        for (let i = 0; i < 8; i++) {
+            STATE.debris.push({
+                x: STATE.raftX + Math.random() * 1000 - 500,
+                y: STATE.raftY + Math.random() * 1000 - 500,
+                type: Math.random() > 0.4 ? 'wood' : 'food',
+                collected: false,
+            });
+        }
+        return;
+    }
+
+    // Power drain
+    let powerDrain = 0.015;
+    if (!STATE.doorLeft) powerDrain += 0.01;  // open doors = less drain (doors closed = more)
+    // Wait, in FNAF closing doors costs power
+    if (STATE.doorLeft === false) powerDrain += 0;
+    // Actually: closed doors cost power
+    powerDrain += (STATE.doorLeft ? 0.008 : 0) + (STATE.doorRight ? 0.008 : 0);
+    if (STATE.lightOn) powerDrain += 0.02;
+    if (STATE.cameraOn) powerDrain += 0.015;
+    STATE.power -= powerDrain;
+
+    if (STATE.power <= 0) {
+        STATE.power = 0;
+        STATE.doorLeft = false;
+        STATE.doorRight = false;
+        STATE.lightOn = false;
+        STATE.cameraOn = false;
+        // Freddy comes after a delay
+        if (Math.random() < 0.02) {
+            gameOver('Der Strom ist aus. Funtime Freddy hat dich gefunden.');
+            return;
+        }
+    }
+
+    // Look direction
+    if (keys['a'] || keys['arrowleft']) STATE.playerDir = 1;
+    if (keys['d'] || keys['arrowright']) STATE.playerDir = 3;
+    if (keys['w'] || keys['arrowup']) STATE.playerDir = 2;
+    if (keys['s'] || keys['arrowdown']) STATE.playerDir = 0;
+
+    // Toggle doors with E
+    if (interactPressed) {
+        interactPressed = false;
+        if (STATE.playerDir === 1) {
+            STATE.doorLeft = !STATE.doorLeft;
+            showMsg(STATE.doorLeft ? 'Linke Tür GESCHLOSSEN' : 'Linke Tür OFFEN', 40);
+        } else if (STATE.playerDir === 3) {
+            STATE.doorRight = !STATE.doorRight;
+            showMsg(STATE.doorRight ? 'Rechte Tür GESCHLOSSEN' : 'Rechte Tür OFFEN', 40);
+        }
+    }
+
+    // Toggle cameras
+    if (cameraToggle) {
+        cameraToggle = false;
+        if (STATE.cameraOn) {
+            STATE.cameraOn = false;
+            STATE.phase = 'facility';
+        } else if (STATE.power > 0) {
+            STATE.cameraOn = true;
+            STATE.phase = 'cameras';
+            STATE.currentCam = 0;
+        }
+    }
+
+    // Animatronic AI
+    for (const anim of STATE.animatronics) {
+        anim.moveTimer += (anim.speed * (1 + STATE.night * 0.15));
+
+        if (anim.moveTimer > 100) {
+            anim.moveTimer = 0;
+
+            // Check if at office door
+            if (anim.room === 0) {
+                // At the office! Check doors
+                if (anim.doorSide === 'left' && !STATE.doorLeft) {
+                    // JUMPSCARE
+                    triggerJumpscare(anim);
+                    return;
+                } else if (anim.doorSide === 'right' && !STATE.doorRight) {
+                    triggerJumpscare(anim);
+                    return;
+                } else if (!anim.doorSide) {
+                    anim.doorSide = Math.random() > 0.5 ? 'left' : 'right';
+                }
+                // If door is closed, might retreat
+                if (Math.random() < 0.3) {
+                    anim.room = anim.startRoom;
+                    anim.doorSide = null;
+                    anim.atDoor = false;
+                }
+            } else {
+                // Move toward office
+                if (Math.random() < (anim.aggression + STATE.night) * 0.05) {
+                    const room = ROOMS[anim.room];
+                    if (room && room.connects.length > 0) {
+                        // Pick a room closer to office (room 0)
+                        const choices = room.connects;
+                        const next = choices[Math.floor(Math.random() * choices.length)];
+                        anim.room = next;
+                        if (next === 0) {
+                            anim.atDoor = true;
+                            anim.doorSide = anim.room <= 2 ? 'left' : 'right';
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+function drawFacility() {
+    const room = ROOMS[STATE.currentRoom];
+
+    // Room background
+    ctx.fillStyle = room.color;
+    ctx.fillRect(0, 0, W, H);
+
+    // Floor
+    const floorY = H * 0.7;
+    ctx.fillStyle = '#111118';
+    ctx.fillRect(0, floorY, W, H - floorY);
+
+    // Checkerboard floor
+    const tileSize = 30;
+    for (let x = 0; x < W; x += tileSize) {
+        for (let y = floorY; y < H; y += tileSize) {
+            if ((Math.floor(x / tileSize) + Math.floor(y / tileSize)) % 2 === 0) {
+                ctx.fillStyle = '#18181f';
+                ctx.fillRect(x, y, tileSize, tileSize);
+            }
+        }
+    }
+
+    // Walls
+    ctx.fillStyle = '#0d0d18';
+    ctx.fillRect(0, 0, 20, H);
+    ctx.fillRect(W - 20, 0, 20, H);
+
+    // Room name
+    ctx.fillStyle = '#444';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(room.name, W/2, 30);
+
+    // Doors
+    if (room.doorL) {
+        ctx.fillStyle = STATE.doorLeft ? '#333344' : '#1a1a2a';
+        ctx.fillRect(0, floorY - 120, 30, 120);
+        // Door status indicator
+        ctx.fillStyle = STATE.doorLeft ? '#ff4444' : '#44ff44';
+        ctx.fillRect(32, floorY - 60, 6, 6);
+        ctx.fillStyle = '#666';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(STATE.doorLeft ? 'ZU' : 'AUF', 32, floorY - 66);
+    }
+    if (room.doorR) {
+        ctx.fillStyle = STATE.doorRight ? '#333344' : '#1a1a2a';
+        ctx.fillRect(W - 30, floorY - 120, 30, 120);
+        ctx.fillStyle = STATE.doorRight ? '#ff4444' : '#44ff44';
+        ctx.fillRect(W - 38, floorY - 60, 6, 6);
+        ctx.fillStyle = '#666';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(STATE.doorRight ? 'ZU' : 'AUF', W - 32, floorY - 66);
+    }
+
+    // Animatronics in room
+    for (const anim of STATE.animatronics) {
+        if (anim.room === STATE.currentRoom) {
+            if (anim.doorSide === 'left') {
+                drawPixelChar(50, floorY - 30, 24, 36, anim.color, 3, true);
+            } else if (anim.doorSide === 'right') {
+                drawPixelChar(W - 50, floorY - 30, 24, 36, anim.color, 1, true);
+            } else {
+                drawPixelChar(W/2 + (Math.sin(Date.now() * 0.002) * 30), floorY - 30, 24, 36, anim.color, 0, true);
+            }
+        }
+    }
+
+    // Office desk (room 0)
+    if (STATE.currentRoom === 0) {
+        ctx.fillStyle = '#2a2a35';
+        ctx.fillRect(W/2 - 60, floorY - 20, 120, 30);
+        // Monitor
+        ctx.fillStyle = '#1a1a28';
+        ctx.fillRect(W/2 - 25, floorY - 50, 50, 35);
+        ctx.fillStyle = STATE.cameraOn ? '#224422' : '#111118';
+        ctx.fillRect(W/2 - 22, floorY - 47, 44, 28);
+        // Fan
+        const fanAngle = Date.now() * 0.01;
+        ctx.save();
+        ctx.translate(W/2 + 45, floorY - 35);
+        ctx.rotate(fanAngle);
+        ctx.fillStyle = '#555';
+        for (let i = 0; i < 3; i++) {
+            ctx.rotate(Math.PI * 2 / 3);
+            ctx.fillRect(-2, -10, 4, 10);
+        }
+        ctx.restore();
+    }
+
+    // Darkness / power out effect
+    if (STATE.power <= 0) {
+        ctx.fillStyle = `rgba(0,0,0,${0.85 + Math.sin(Date.now() * 0.003) * 0.1})`;
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#ff0000';
+        ctx.font = '16px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('KEIN STROM', W/2, H/2);
+    }
+
+    // Flickering light
+    if (Math.random() < 0.02) {
+        ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
+        ctx.fillRect(0, 0, W, H);
+    }
+
+    // Vignette
+    const vg = ctx.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.7);
+    vg.addColorStop(0, 'transparent');
+    vg.addColorStop(1, 'rgba(0,0,0,0.7)');
+    ctx.fillStyle = vg;
+    ctx.fillRect(0, 0, W, H);
+}
+
+// ===== CAMERAS =====
+function drawCameras() {
+    ctx.fillStyle = '#0a0a12';
+    ctx.fillRect(0, 0, W, H);
+
+    // Camera grid
+    ctx.fillStyle = '#111';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('ÜBERWACHUNGSKAMERAS', W/2, 28);
+
+    // Static noise
+    for (let i = 0; i < 500; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.08})`;
+        ctx.fillRect(Math.random() * W, Math.random() * H, 2, 2);
+    }
+
+    // Camera buttons
+    const camW = Math.min(120, (W - 60) / 3);
+    const camH = 80;
+    const startX = W/2 - (camW * 3 + 20) / 2;
+
+    ROOMS.forEach((room, i) => {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        const x = startX + col * (camW + 10);
+        const y = 50 + row * (camH + 10);
+
+        const isCurrent = STATE.currentCam === i;
+        ctx.fillStyle = isCurrent ? '#1a2a1a' : '#0f0f18';
+        ctx.strokeStyle = isCurrent ? '#44ff44' : '#222';
+        ctx.lineWidth = 1;
+        ctx.fillRect(x, y, camW, camH);
+        ctx.strokeRect(x, y, camW, camH);
+
+        // Room name
+        ctx.fillStyle = isCurrent ? '#44ff44' : '#444';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(room.name, x + camW/2, y + 14);
+
+        // Animatronics in this room
+        const animsHere = STATE.animatronics.filter(a => a.room === i);
+        animsHere.forEach((a, ai) => {
+            drawPixelChar(x + camW/2 + ai * 20 - (animsHere.length-1)*10, y + camH/2 + 8, 12, 18, a.color, 0, true);
+        });
+
+        if (animsHere.length === 0) {
+            ctx.fillStyle = '#222';
+            ctx.fillText('leer', x + camW/2, y + camH/2 + 12);
+        }
+    });
+
+    // Navigate cameras with arrows
+    if (keys['a'] || keys['arrowleft']) {
+        keys['a'] = false; keys['arrowleft'] = false;
+        STATE.currentCam = (STATE.currentCam - 1 + ROOMS.length) % ROOMS.length;
+    }
+    if (keys['d'] || keys['arrowright']) {
+        keys['d'] = false; keys['arrowright'] = false;
+        STATE.currentCam = (STATE.currentCam + 1) % ROOMS.length;
+    }
+
+    // CRT effect
+    ctx.fillStyle = 'rgba(0,50,0,0.03)';
+    for (let y = 0; y < H; y += 3) {
+        ctx.fillRect(0, y, W, 1);
+    }
+
+    // "Press SPACE to close cameras"
+    ctx.fillStyle = '#333';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('SPACE = Kameras schließen  |  ←→ = Kamera wechseln', W/2, H - 20);
+
+    // Recording indicator
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath();
+    ctx.arc(W - 30, 30, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff4444';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText('REC', W - 40, 34);
+}
+
+// ===== JUMPSCARE =====
+function triggerJumpscare(anim) {
+    const jsCanvas = document.getElementById('js-canvas');
+    const jsCtx = jsCanvas.getContext('2d');
+    jsCanvas.width = W;
+    jsCanvas.height = H;
+    document.getElementById('jumpscare').classList.add('on');
+
+    let frame = 0;
+    const jsAnim = setInterval(() => {
+        jsCtx.fillStyle = '#000';
+        jsCtx.fillRect(0, 0, W, H);
+
+        // Shaking animatronic face
+        const shakeX = (Math.random() - 0.5) * 30;
+        const shakeY = (Math.random() - 0.5) * 20;
+        const cx = W/2 + shakeX;
+        const cy = H/2 + shakeY;
+        const size = H * 0.6;
+
+        // Face
+        jsCtx.fillStyle = anim.color;
+        jsCtx.fillRect(cx - size/2, cy - size/2, size, size);
+
+        // Eyes - wide and red
+        jsCtx.fillStyle = '#ff0000';
+        jsCtx.fillRect(cx - size/4 - 15, cy - size/6, 30, 20);
+        jsCtx.fillRect(cx + size/4 - 15, cy - size/6, 30, 20);
+
+        // Mouth - wide open
+        jsCtx.fillStyle = '#000';
+        jsCtx.fillRect(cx - size/3, cy + size/6, size * 0.66, size/4);
+        // Teeth
+        jsCtx.fillStyle = '#fff';
+        for (let t = 0; t < 6; t++) {
+            jsCtx.fillRect(cx - size/3 + t * (size * 0.66 / 6) + 2, cy + size/6, 6, 10);
+        }
+
+        // Name
+        jsCtx.fillStyle = '#fff';
+        jsCtx.font = 'bold 20px monospace';
+        jsCtx.textAlign = 'center';
+        jsCtx.fillText(anim.name.toUpperCase(), cx, cy + size/2 + 30);
+
+        // Static noise
+        for (let i = 0; i < 300; i++) {
+            jsCtx.fillStyle = `rgba(255,255,255,${Math.random() * 0.15})`;
+            jsCtx.fillRect(Math.random() * W, Math.random() * H, 3, 3);
+        }
+
+        frame++;
+        if (frame > 30) {
+            clearInterval(jsAnim);
+            document.getElementById('jumpscare').classList.remove('on');
+            gameOver(`${anim.name} hat dich erwischt!`);
+        }
+    }, 50);
+}
+
+// ===== GAME OVER =====
+function gameOver(reason) {
+    STATE.phase = 'gameover';
+    document.getElementById('go-reason').textContent = reason;
+    document.getElementById('gameover').classList.add('on');
+    document.getElementById('hud').classList.remove('on');
+}
+
+function restartGame() {
+    document.getElementById('gameover').classList.remove('on');
+    STATE.hp = 100;
+    STATE.hunger = 100;
+    STATE.power = 100;
+    STATE.night = 1;
+    STATE.time = 0;
+    STATE.facilityFound = false;
+    STATE.facilityEntered = false;
+    STATE.score = 0;
+    initRaft();
+    document.getElementById('hud').classList.add('on');
+}
+
+// ===== MAIN LOOP =====
+function startGame() {
+    document.getElementById('title-screen').classList.add('gone');
+    document.getElementById('hud').classList.add('on');
+    initRaft();
+}
+
+function gameLoop() {
+    // Clear
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, W, H);
+
+    if (STATE.phase === 'raft') {
+        updateRaft();
+        drawRaft();
+    } else if (STATE.phase === 'facility') {
+        updateFacility();
+        drawFacility();
+    } else if (STATE.phase === 'cameras') {
+        updateFacility(); // AI still moves
+        drawCameras();
+    }
+
+    // Update HUD
+    if (STATE.phase !== 'title' && STATE.phase !== 'gameover') {
+        updateHUD();
+    }
+
+    // Message timer
+    if (STATE.msgTimer > 0) {
+        STATE.msgTimer--;
+        if (STATE.msgTimer <= 0) {
+            document.getElementById('msg-box').classList.remove('show');
+        }
+    }
+
+    // Reset one-frame inputs
+    interactPressed = false;
+    cameraToggle = false;
+
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+</body>
+</html>

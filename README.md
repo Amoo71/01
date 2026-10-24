@@ -1,20 +1,32 @@
-# Cloud Desktop A
+# Circus Baby's Ocean Facility
 
-GitHub Codespace — Desktop A (Account 1).
-noVNC + Google Chrome + Openbox on port 6080.
-API on port 8080.
+**FNAF: Sister Location × Raft — Fusion Game**
 
-## Setup
+A complete HTML5 Canvas game that merges Five Nights at Freddy's: Sister Location with Raft into one unified experience.
 
-1. Fork / push this repo to GitHub Account A
-2. Create a Codespace (Code → Codespaces → New)
-3. Codespace auto-starts desktop on ports 6080 & 8080
-4. Set secrets in Codespace settings:
-   - `VNC_PASSWORD` (default: V1312)
-   - `DATABASE_URL` (Supabase Session Pooler URL)
-   - `IDLE_TIMEOUT` (default: 300 = 5min)
+## Play
 
-## Access
+Open `index.html` in any browser or visit the GitHub Pages deployment.
 
-- noVNC: `https://CODESPACE_NAME-6080.preview.app.github.dev/vnc.html`
-- API:   `https://CODESPACE_NAME-8080.preview.app.github.dev/api/health`
+## Features
+
+- **Raft Ocean Exploration** — Start on a raft, collect debris (wood & food), expand your raft
+- **Mysterious Island** — Discover Circus Baby's Entertainment & Rental facility on a remote island
+- **FNAF Facility** — Enter the underground facility with rooms from Sister Location (Office, Baby's Auditorium, Ballora Gallery, Funtime Auditorium, Parts & Service, Scooping Room)
+- **Animatronic AI** — Circus Baby, Ballora, Funtime Freddy, Funtime Foxy, and Ennard hunt you with increasing aggression
+- **Power Management** — Monitor power while controlling doors and cameras
+- **Camera System** — FNAF-style surveillance cameras to track animatronics
+- **Night Cycle** — Survive from 12 AM to 6 AM, each night harder than the last
+- **Survival Loop** — After each night, return to the ocean for more resources before the next night
+
+## Controls
+
+| Action | Keyboard | Mobile |
+|--------|----------|--------|
+| Move | WASD / Arrow Keys | D-Pad |
+| Interact / Toggle Doors | E | E Button |
+| Toggle Cameras | Space | CAM Button |
+
+## Tech
+
+Single HTML file, zero dependencies. Pure Canvas 2D rendering with touch support for mobile.
